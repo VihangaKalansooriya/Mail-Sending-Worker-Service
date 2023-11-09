@@ -1,0 +1,12 @@
+{
+  "SqlServerConnection": {
+	"Server": "34.87.42.154",
+    "DataBase": "myPOS_DB_Cargills",
+    "Username": "pll",
+    "Password": "myposadminauthentication"
+  },
+  "Paths": {
+    "rdlcPath": "C:\\Users\\Priyashad\\source\\repos\\POSBackend_REST_API\\POSBackend_REST_API\\wwwroot\\Reports\\",
+    "parentPath": "C:\\Users\\Priyashad\\source\\repos\\POSBackend_REST_API\\POSBackend_REST_API\\wwwroot\\Temp_Print"
+  }
+}
