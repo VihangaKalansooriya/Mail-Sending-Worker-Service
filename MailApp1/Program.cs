@@ -25,6 +25,8 @@ class Program
         Globalconfig.SenderPassword = config.GetSection("EmailConfiguration")["SenderPassword"];
         Globalconfig.logfilepath = config.GetSection("LogfilePath")["logfilepath"];
         Globalconfig.databasename = config.GetSection("DatabaseConfiguration")["databasename"];
+        Globalconfig.TransactionTemplate = config.GetSection("EmailTemplates")["TransactionTemplate"];
+        Globalconfig.PermissionTemplate = config.GetSection("EmailTemplates")["PermissionTemplate"];
 
         try
         {

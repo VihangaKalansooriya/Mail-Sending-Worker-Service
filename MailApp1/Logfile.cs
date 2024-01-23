@@ -29,4 +29,5 @@ public class LoggerService
         logger.Error(message);
         Log.CloseAndFlush();
     }
+
 }

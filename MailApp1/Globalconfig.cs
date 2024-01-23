@@ -13,5 +13,7 @@ namespace MailApp1
         public static string SenderPassword { get; set; }
         public static string logfilepath { get; set; }
         public static string databasename { get; set; }
+        public static string TransactionTemplate { get; set; }
+        public static string PermissionTemplate { get; set;}
     }
 }

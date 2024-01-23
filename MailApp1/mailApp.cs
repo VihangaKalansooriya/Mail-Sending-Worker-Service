@@ -25,9 +25,52 @@ public class mailApp
         this.loggerService = loggerService;
     }
 
+    //public async Task ProcessEmails()
+    //{
+    //    DataTable dt = new DataTable();
+    //    using (SqlConnection sourceConnection = new SqlConnection(Globalconfig.ConnectionString))
+    //    {
+    //        sourceConnection.Open();
+    //        string query = "SELECT TB_ID, TB_RECEIVERMAIL FROM TB_MAILDETAILS WHERE TB_STATUS = 0";
+
+    //        using (SqlCommand command = new SqlCommand(query, sourceConnection))
+    //        {
+    //            using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+    //            {
+    //                adapter.Fill(dt); 
+    //            }
+    //        }
+    //    }
+
+    //    foreach (DataRow row in dt.Rows)
+    //    {
+    //        int id = (int)row["TB_ID"];
+    //        string recipientEmail = row["TB_RECEIVERMAIL"].ToString();
+
+    //        await SendEmailAsync(recipientEmail, id);
+    //    }
+    //}
     public async Task ProcessEmails()
     {
-        DataTable dt = new DataTable();
+        try
+        {
+            List<EmailData> emailDataList = GetEmailDataFromDatabase();
+
+            foreach (var emailData in emailDataList)
+            {
+                await SendEmailAsync(emailData.RecipientEmail, emailData.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error processing emails: " + ex.ToString());
+            loggerService.LogError("An error occurred while processing emails: " + ex.Message);
+        }
+    }
+    private List<EmailData> GetEmailDataFromDatabase()
+    {
+        List<EmailData> emailDataList = new List<EmailData>();
+
         using (SqlConnection sourceConnection = new SqlConnection(Globalconfig.ConnectionString))
         {
             sourceConnection.Open();
@@ -35,27 +78,27 @@ public class mailApp
 
             using (SqlCommand command = new SqlCommand(query, sourceConnection))
             {
-                using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+                using (SqlDataReader reader = command.ExecuteReader())
                 {
-                    adapter.Fill(dt); 
+                    while (reader.Read())
+                    {
+                        int id = (int)reader["TB_ID"];
+                        string recipientEmail = reader["TB_RECEIVERMAIL"].ToString();
+
+                        emailDataList.Add(new EmailData { Id = id, RecipientEmail = recipientEmail });
+                    }
                 }
             }
         }
 
-        foreach (DataRow row in dt.Rows)
-        {
-            int id = (int)row["TB_ID"];
-            string recipientEmail = row["TB_RECEIVERMAIL"].ToString();
-
-            await SendEmailAsync(recipientEmail, id);
-        }
+        return emailDataList;
     }
-
     public async Task SendEmailAsync(string recipientEmail, int id)
     {
         try
         {
             loggerService.LogInformation("Processing emails...");
+            MailMessage mail = null;
             SmtpClient smtpClient = new SmtpClient("smtp.office365.com")
             {
                 Port = 587,
@@ -68,7 +111,7 @@ public class mailApp
             using (SqlConnection dbConnection = new SqlConnection(Globalconfig.ConnectionString))
             {
                 dbConnection.Open();
-                string query = "SELECT TB_TYPE, TB_RUNNO FROM TB_MAILDETAILS WHERE TB_ID = @ID";
+                string query = "SELECT TB_TYPE, TB_RUNNO, TB_TRTYPE, TB_URL FROM TB_MAILDETAILS WHERE TB_ID = @ID";
 
                 using (SqlCommand command = new SqlCommand(query, dbConnection))
                 {
@@ -82,22 +125,44 @@ public class mailApp
                             argsval.Add("code", reader["TB_RUNNO"].ToString());
                             argsval.Add("menuCode", reader["TB_TYPE"].ToString());
                             argsval.Add("db", Globalconfig.databasename);
+
+                            string trType = reader["TB_TRTYPE"].ToString();
+                            string url = reader["TB_URL"].ToString();
+
+                            if (trType == "T")
+                            {
+                                mail = new MailMessage(Globalconfig.SenderEmail, recipientEmail)
+                                {
+                                    Subject = $"{argsval["menuCode"]} Report Attached.",
+                                    Body = Globalconfig.TransactionTemplate.Replace("{menuCode}", argsval["menuCode"].ToString())
+                                              .Replace("{id}", id.ToString())
+                                              .Replace("{trType}", trType)
+                                };
+                            }
+                            else if (trType == "P")
+                            {
+                                mail = new MailMessage(Globalconfig.SenderEmail, recipientEmail)
+                                {
+                                    Subject = $" Request for Permission {argsval["menuCode"]} Report",
+                                    Body = Globalconfig.PermissionTemplate.Replace("{menuCode}", argsval["menuCode"].ToString())
+                                             .Replace("{id}", id.ToString())
+                                             .Replace("{trType}", trType)
+                                             .Replace("{url}", url)
+                                };
+                            }
                         }
                     }
                 }
             }
 
-            MailMessage mail = new MailMessage(Globalconfig.SenderEmail, recipientEmail)
-            {
-                Subject = $"{argsval["menuCode"]} Report",
-                Body = $"Dear Sir/Madam,\nThis email contains a {argsval["menuCode"]} PDF attachment for ID {id}\nThank You."
-            };
-
             var startInfo = new ProcessStartInfo
             {
                 FileName = $"C:\\Users\\User\\source\\repos\\MailApp1\\ReportGen\\ReportGenerator.exe",
                 Arguments = JsonConvert.SerializeObject(JsonConvert.SerializeObject(argsval)),
-                RedirectStandardOutput = true
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
 
             using (Process process = new Process())
@@ -142,4 +207,9 @@ public class mailApp
         }
     }  
 
+}
+public class EmailData
+{
+    public int Id { get; set; }
+    public string RecipientEmail { get; set; }
 }
