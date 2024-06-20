@@ -9,11 +9,18 @@ using System.Net.Mime;
 using MailApp1;
 using Serilog;
 
+//***************************************************************************
+// File: Email Sending Application
+// Author: Vihanga Kalansooriya
+// Date: June 16, 2024
+// Contact: techsupport.02@24x7retail.com
+//***************************************************************************
+
 class Program
 {
     static async Task Main()
     {
-        
+
         var basepath = Directory.GetCurrentDirectory();
 
         var config = new ConfigurationBuilder()
@@ -27,6 +34,10 @@ class Program
         Globalconfig.databasename = config.GetSection("DatabaseConfiguration")["databasename"];
         Globalconfig.TransactionTemplate = config.GetSection("EmailTemplates")["TransactionTemplate"];
         Globalconfig.PermissionTemplate = config.GetSection("EmailTemplates")["PermissionTemplate"];
+        Globalconfig.reportgeneratorpath = config.GetSection("RepoGenPath")["reportgeneratorpath"];
+        Globalconfig.PdfFullPath = config.GetSection("AppConfig")["PdfFullPath"];
+        Globalconfig.SenderEmail = config.GetSection("EmailConfiguration")["SMTPclient"];
+        Globalconfig.SenderPassword = config.GetSection("EmailConfiguration")["Port"];
 
         try
         {

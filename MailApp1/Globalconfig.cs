@@ -15,5 +15,8 @@ namespace MailApp1
         public static string databasename { get; set; }
         public static string TransactionTemplate { get; set; }
         public static string PermissionTemplate { get; set;}
+        public static string reportgeneratorpath { get; set; }
+        public static string PdfFullPath { get; set; }
+
     }
 }

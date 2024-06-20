@@ -24,32 +24,6 @@ public class mailApp
     {
         this.loggerService = loggerService;
     }
-
-    //public async Task ProcessEmails()
-    //{
-    //    DataTable dt = new DataTable();
-    //    using (SqlConnection sourceConnection = new SqlConnection(Globalconfig.ConnectionString))
-    //    {
-    //        sourceConnection.Open();
-    //        string query = "SELECT TB_ID, TB_RECEIVERMAIL FROM TB_MAILDETAILS WHERE TB_STATUS = 0";
-
-    //        using (SqlCommand command = new SqlCommand(query, sourceConnection))
-    //        {
-    //            using (SqlDataAdapter adapter = new SqlDataAdapter(command))
-    //            {
-    //                adapter.Fill(dt); 
-    //            }
-    //        }
-    //    }
-
-    //    foreach (DataRow row in dt.Rows)
-    //    {
-    //        int id = (int)row["TB_ID"];
-    //        string recipientEmail = row["TB_RECEIVERMAIL"].ToString();
-
-    //        await SendEmailAsync(recipientEmail, id);
-    //    }
-    //}
     public async Task ProcessEmails()
     {
         try
@@ -74,7 +48,7 @@ public class mailApp
         using (SqlConnection sourceConnection = new SqlConnection(Globalconfig.ConnectionString))
         {
             sourceConnection.Open();
-            string query = "SELECT TB_ID, TB_RECEIVERMAIL FROM TB_MAILDETAILS WHERE TB_STATUS = 0";
+            string query = "SELECT TB_ID, TB_RECEIVERMAIL FROM M_TBLMAILDETAILS WHERE TB_STATUS = 0";
 
             using (SqlCommand command = new SqlCommand(query, sourceConnection))
             {
@@ -111,7 +85,7 @@ public class mailApp
             using (SqlConnection dbConnection = new SqlConnection(Globalconfig.ConnectionString))
             {
                 dbConnection.Open();
-                string query = "SELECT TB_TYPE, TB_RUNNO, TB_TRTYPE, TB_URL FROM TB_MAILDETAILS WHERE TB_ID = @ID";
+                string query = "SELECT TB_TYPE, TB_RUNNO, TB_TRTYPE, TB_URL FROM M_TBLMAILDETAILS WHERE TB_ID = @ID";
 
                 using (SqlCommand command = new SqlCommand(query, dbConnection))
                 {
@@ -157,7 +131,7 @@ public class mailApp
 
             var startInfo = new ProcessStartInfo
             {
-                FileName = $"C:\\Users\\User\\source\\repos\\MailApp1\\ReportGen\\ReportGenerator.exe",
+                FileName = Globalconfig.reportgeneratorpath,
                 Arguments = JsonConvert.SerializeObject(JsonConvert.SerializeObject(argsval)),
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -172,7 +146,7 @@ public class mailApp
                 await process.WaitForExitAsync();
                 var output = await process.StandardOutput.ReadToEndAsync();
                 string resultString = output.Replace("\r", "").Replace("\n", "");
-                string pdfFullPath = $"C:\\Users\\User\\source\\repos\\MailApp1\\GeneratedFiles\\{resultString}.pdf";
+                string pdfFullPath = Path.Combine(Globalconfig.PdfFullPath, $"{resultString}.pdf");
                 Attachment attachment = new Attachment(pdfFullPath, MediaTypeNames.Application.Pdf);
                 mail.Attachments.Add(attachment);
                 await smtpClient.SendMailAsync(mail);
@@ -192,7 +166,7 @@ public class mailApp
 
     static void UpdateStatus(int id)
     {
-        string updateQuery = "UPDATE TB_MAILDETAILS SET TB_STATUS = 1 WHERE TB_ID = @ID";
+        string updateQuery = "UPDATE M_TBLMAILDETAILS SET TB_STATUS = 1 WHERE TB_ID = @ID";
         Console.WriteLine("Status Update: " + id);
 
         using (SqlConnection con = new SqlConnection(Globalconfig.ConnectionString))
