@@ -15,6 +15,10 @@ using System.Reflection.PortableExecutable;
 using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Transactions;
+using ClosedXML.Excel;
+using System.IO;
+using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Office2010.Excel;
 
 public class mailApp
 {
@@ -22,6 +26,7 @@ public class mailApp
     {
         try
         {
+
             List<EmailData> emailDataList = GetEmailDataFromDatabase();
 
             foreach (var emailData in emailDataList)
@@ -31,7 +36,7 @@ public class mailApp
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error processing emails: " + ex.ToString());
+            //Console.WriteLine("Error processing emails: " + ex.ToString());
             Logger.LogError("Error processing emails:", ex);
         }
     }
@@ -61,6 +66,7 @@ public class mailApp
 
         return emailDataList;
     }
+
     public async Task SendEmailAsync(string recipientEmail, int id)
     {
         try
@@ -78,7 +84,7 @@ public class mailApp
             using (SqlConnection dbConnection = new SqlConnection(Globalconfig.ConnectionString))
             {
                 dbConnection.Open();
-                string query = "SELECT TB_TYPE, TB_RUNNO, TB_DESC, TB_TRTYPE, TB_URL, TB_SUBJECT, TB_BODY FROM M_TBLMAILDETAILS WHERE TB_ID = @ID";
+                string query = "SELECT md.TB_LOCATION, md.TB_DATE, md.TB_TYPE, md.TB_RUNNO, md.TB_DESC, md.TB_TRTYPE, md.TB_URL, md.TB_SUBJECT, md.TB_BODY, ml.LOC_DESC, md.TB_TRAMT, sp.SM_NAME, cm.CM_FULLNAME, md.TB_TRSUP, md.TB_TRCUS FROM M_TBLMAILDETAILS md INNER JOIN M_TBLLOCATIONS ml ON md.TB_LOCATION = ml.LOC_CODE LEFT OUTER JOIN M_TBLSUPPLIER sp ON md.TB_TRSUP = sp.SM_CODE LEFT OUTER JOIN M_TBLCUSTOMER cm ON md.TB_TRCUS = cm.CM_CODE WHERE TB_ID = @ID";
 
                 using (SqlCommand command = new SqlCommand(query, dbConnection))
                 {
@@ -99,54 +105,111 @@ public class mailApp
                             string url = reader["TB_URL"].ToString();
                             string tbType = reader["TB_TYPE"] as string;
                             string tbDesc = reader["TB_DESC"] as string;
-                            string tbRunno = reader["TB_RUNNO"] as string;
-
+                            string tbRunno = reader["TB_RUNNO"].ToString();
+                            string locCode = reader["TB_LOCATION"] as string;
+                            string locName = reader["LOC_DESC"].ToString();
+                            string supName = reader["SM_NAME"].ToString();
+                            string cusName = reader["CM_FULLNAME"].ToString();
+                            string amount = reader["TB_TRAMT"].ToString();
+                            DateTime dateValue = reader["TB_DATE"] as DateTime? ?? DateTime.MinValue; 
+                            string dateOnly = dateValue.ToString("yyyy-MM-dd");
 
                             if (trType == "T")
                             {
-                                if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(body))
-                                {
-                                    string menuCode = reader["TB_TYPE"].ToString();
-                                    subject = $"{menuCode} Report Attached.";
-                                    body = Globalconfig.TransactionTemplate.Replace("{menuCode}", menuCode)
-                                                                           .Replace("{id}", id.ToString())
-                                                                           .Replace("{trType}", trType);
-                                }
-
                                 mail = new MailMessage(Globalconfig.SenderEmail, recipientEmail)
                                 {
-                                    Subject = subject,
-                                    Body = body.Replace(@"\n", Environment.NewLine)
+                                    Subject = $"Processed Transaction: {argsval["menuCode"]} - [{tbRunno}] Location: {locName}",
+                                    Body = Globalconfig.TransactionTemplate.Replace("{menuCode}", argsval["menuCode"].ToString())
+                                              .Replace("{id}", id.ToString())
+                                              .Replace("{trType}", trType)
                                 };
 
-                            }
+                                var startInfo = new ProcessStartInfo
+                                {
+                                    FileName = Globalconfig.reportgeneratorpath,
+                                    Arguments = JsonConvert.SerializeObject(JsonConvert.SerializeObject(argsval)),
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError = true,
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true
+                                };
 
-                            //if (trType == "T")
-                            //{
-                            //    mail = new MailMessage(Globalconfig.SenderEmail, recipientEmail)
-                            //    {
-                            //        Subject = $"{argsval["menuCode"]} Report Attached.",
-                            //        Body = Globalconfig.TransactionTemplate.Replace("{menuCode}", argsval["menuCode"].ToString())
-                            //                  .Replace("{id}", id.ToString())
-                            //                  .Replace("{trType}", trType)
-                            //    };
-                            //}
+                                using (Process process = new Process())
+                                {
+                                    process.StartInfo = startInfo;
+                                    process.Start();
+                                    await process.WaitForExitAsync();
+                                    var output = await process.StandardOutput.ReadToEndAsync();
+                                    string resultString = output.Replace("\r", "").Replace("\n", "");
+                                    string pdfFullPath = Path.Combine(Globalconfig.PdfFullPath, $"{resultString}.pdf");
+                                    Attachment attachment = new Attachment(pdfFullPath, MediaTypeNames.Application.Pdf);
+                                    mail.Attachments.Add(attachment);
+                                    await smtpClient.SendMailAsync(mail);
+                                    Logger.LogInformation($"PDF Attached:{resultString}.pdf");
+                                    Console.WriteLine("Email sent with PDF attachment for ID " + id);
+                                    UpdateStatus(id);
+                                    Log.CloseAndFlush();
+                                }
+                            }
 
                             else if (trType == "P")
                             {
                                 mail = new MailMessage(Globalconfig.SenderEmail, recipientEmail)
                                 {
-                                    Subject = $" Request for Permission {argsval["menuCode"]} Report",
+                                    Subject = $"Approval Required: {tbDesc} - [{tbRunno}] @Location: {locName}",
+                                    Body = Globalconfig.PermissionTemplate.Replace("{menuCode}", argsval["menuCode"].ToString())
+                                             .Replace("{id}", id.ToString())
+                                             .Replace("{tbType}", tbType)
+                                             .Replace("{tbDesc}", tbDesc)
+                                             .Replace("{locName}", locName)
+                                             .Replace("{tbRunno}", tbRunno)
+                                             .Replace("{locCode}", locCode)
+                                             .Replace("{url}", url)
+                                             .Replace("{supName}", supName)
+                                             .Replace("{cusName}", cusName)
+                                             .Replace("{amount}", amount)
+                                             .Replace("{dateOnly}", dateOnly)
+                                };
+
+                                var startInfo = new ProcessStartInfo
+                                {
+                                    FileName = Globalconfig.reportgeneratorpath,
+                                    Arguments = JsonConvert.SerializeObject(JsonConvert.SerializeObject(argsval)),
+                                    RedirectStandardOutput = true,
+                                    RedirectStandardError = true,
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true
+                                };
+
+                                using (Process process = new Process())
+                                {
+                                    process.StartInfo = startInfo;
+                                    process.Start();
+                                    await process.WaitForExitAsync();
+                                    var output = await process.StandardOutput.ReadToEndAsync();
+                                    string resultString = output.Replace("\r", "").Replace("\n", "");
+                                    string pdfFullPath = Path.Combine(Globalconfig.PdfFullPath, $"{resultString}.pdf");
+                                    Attachment attachment = new Attachment(pdfFullPath, MediaTypeNames.Application.Pdf);
+                                    mail.Attachments.Add(attachment);
+                                    await smtpClient.SendMailAsync(mail);
+                                    Logger.LogInformation($"PDF Attached:{resultString}.pdf");
+                                    Console.WriteLine("Email sent with PDF attachment for ID " + id);
+                                    UpdateStatus(id);
+                                    Log.CloseAndFlush();
+                                }
+                            }
+                            else if (trType == "C")
+                            {
+                                mail = new MailMessage(Globalconfig.SenderEmail, recipientEmail)
+                                {
+                                    Subject = $"Approval Required: {argsval["menuCode"]} Location: {locName}",
                                     Body = Globalconfig.PermissionTemplate.Replace("{menuCode}", argsval["menuCode"].ToString())
                                              .Replace("{id}", id.ToString())
                                              .Replace("{trType}", trType)
                                              .Replace("{url}", url)
                                 };
-                            }
 
-                            if (string.IsNullOrEmpty(tbType) && string.IsNullOrEmpty(tbDesc) && string.IsNullOrEmpty(tbRunno))
-                            {
-                                // Send the email without generating the report or attaching the PDF
+                             
                                 await smtpClient.SendMailAsync(mail);
                                 Logger.LogInformation($"Email sent without PDF for ID {id}");
                                 Console.WriteLine("Email sent without PDF attachment for ID " + id);
@@ -154,58 +217,139 @@ public class mailApp
                                 Log.CloseAndFlush();
                                 return;
                             }
-                            else
+                            else if(trType == "E")
                             {
-                                argsval.Add("reportName", "transaction");
-                                argsval.Add("userType", "ADMIN");
-                                argsval.Add("code", tbRunno);
-                                argsval.Add("menuCode", tbType);
-                                argsval.Add("db", Globalconfig.databasename);
+                                mail = new MailMessage(Globalconfig.SenderEmail, recipientEmail)
+                                {
+                                    Subject = $"Processed Transaction: {argsval["menuCode"]} - [{tbRunno}] Location: {locName}",
+                                    Body = Globalconfig.ExcelTemplate.Replace("{menuCode}", argsval["menuCode"].ToString())
+                                             .Replace("{id}", id.ToString())
+                                             .Replace("{trType}", trType)
+                                             .Replace("{url}", url)
+                                };
+                                
+                                string excelFilePath = CreateExcelReport(id, tbType, tbRunno, locCode);
+                                Attachment excelAttachment = new Attachment(excelFilePath, MediaTypeNames.Application.Octet);
+                                mail.Attachments.Add(excelAttachment);
+                                smtpClient = new SmtpClient(Globalconfig.SMTPclient)
+                                {
+                                    Port = Globalconfig.Port,
+                                    EnableSsl = true,
+                                    Credentials = new NetworkCredential(Globalconfig.SenderEmail, Globalconfig.SenderPassword)
+                                };
+
+                                await smtpClient.SendMailAsync(mail);
+                                Console.WriteLine($"Email with Excel attachment sent for ID"+ id);
+                                UpdateStatus(id);
                             }
+
                         }
                     }
                 }
             }
 
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = Globalconfig.reportgeneratorpath,
-                Arguments = JsonConvert.SerializeObject(JsonConvert.SerializeObject(argsval)),
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
 
-            using (Process process = new Process())
-            {
-                process.StartInfo = startInfo;
-                process.Start();
-                await process.WaitForExitAsync();
-                var output = await process.StandardOutput.ReadToEndAsync();
-                string resultString = output.Replace("\r", "").Replace("\n", "");
-                string pdfFullPath = Path.Combine(Globalconfig.PdfFullPath, $"{resultString}.pdf");
-                Attachment attachment = new Attachment(pdfFullPath, MediaTypeNames.Application.Pdf);
-                mail.Attachments.Add(attachment);
-                await smtpClient.SendMailAsync(mail);
-                Logger.LogInformation($"PDF Attached:{resultString}.pdf");
-                Console.WriteLine("Email sent with PDF attachment for ID " + id);
-                UpdateStatus(id);
-                Log.CloseAndFlush();
-            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Error attaching or sending email: " + ex.ToString());
+            //Console.WriteLine("Error attaching or sending email: " + ex.ToString());
             Logger.LogError("Error running ReportGenerator.exe", ex);
         }
 
     }
 
+    //private string GenerateAndAttachPdf(Dictionary<string, object> argsval, String tbRunno)
+    //{
+    //    var startInfo = new ProcessStartInfo
+    //    {
+    //        FileName = Globalconfig.reportgeneratorpath,
+    //        Arguments = JsonConvert.SerializeObject(argsval),
+    //        RedirectStandardOutput = true,
+    //        RedirectStandardError = true,
+    //        UseShellExecute = false,
+    //        CreateNoWindow = true
+    //    };
+
+    //    using (Process process = new Process())
+    //    {
+    //        process.StartInfo = startInfo;
+    //        process.Start();
+    //        process.WaitForExit();
+
+    //        var output = process.StandardOutput.ReadToEnd();
+    //        string resultString = output.Trim();
+    //        string pdfFullPath = Path.Combine(Globalconfig.PdfFullPath, $"{resultString}.pdf");
+
+    //        if (!File.Exists(pdfFullPath))
+    //        {
+    //            throw new FileNotFoundException("PDF not generated.", pdfFullPath);
+    //        }
+
+    //        Logger.LogInformation($"PDF Generated: {resultString}.pdf");
+    //        return pdfFullPath;
+    //    }
+    //}
+
+    private string CreateExcelReport(int id,String tbType,String tbRunno,String locCode)
+    {
+        string filePath = Path.Combine(Globalconfig.AttachedEXFilePath, $"TransactionReport_{id}.xlsx");
+
+        using (var workbook = new XLWorkbook())
+        {
+            var worksheet = workbook.Worksheets.Add("Transaction Report");
+
+            // Add Header Row
+            worksheet.Cell(1, 1).Value = "RUN NO";
+            worksheet.Cell(1, 2).Value = "LOCATION";
+            worksheet.Cell(1, 3).Value = "PRODUCT CODE";
+            worksheet.Cell(1, 4).Value = "PRODUCT DESCRIPTION";
+            worksheet.Cell(1, 5).Value = "CASE QTY";
+            worksheet.Cell(1, 6).Value = "COST PRICE";
+            worksheet.Cell(1, 7).Value = "AMOUNT";
+
+            // Fetch transaction details from the database
+            using (SqlConnection dbConnection = new SqlConnection(Globalconfig.ConnectionString))
+            {
+                dbConnection.Open();
+                string query = "DECLARE @DetailTableName NVARCHAR(100);"+
+                "SELECT @DetailTableName = TX_DETAILTABLE FROM U_TBLTXNSETUP WHERE TX_TYPE = @TB_TYPE;"+
+                "DECLARE @SQLQuery NVARCHAR(MAX);"+
+                "SET @SQLQuery = N'SELECT * FROM ' + QUOTENAME(@DetailTableName) + ' WHERE DET_RUNNO = @TB_RUNNO';"+
+                "EXEC sp_executesql @SQLQuery, N'@TB_RUNNO NVARCHAR(13), @Location NVARCHAR(5)', @TB_RUNNO, @Location;";
+
+                using (SqlCommand command = new SqlCommand(query, dbConnection))
+                {
+                    command.Parameters.AddWithValue("@ID", id);
+                    command.Parameters.AddWithValue("@TB_TYPE", tbType);
+                    command.Parameters.AddWithValue("@TB_RUNNO", tbRunno.ToString());
+                    command.Parameters.AddWithValue("@Location", locCode.ToString());
+                    using (SqlDataReader reader = command.ExecuteReader())
+                    {
+                        int row = 2; 
+                        while (reader.Read())
+                        {
+                            worksheet.Cell(row, 1).Value = reader["DET_RUNNO"].ToString();
+                            worksheet.Cell(row, 2).Value = reader["DET_LOCFROM"].ToString();
+                            worksheet.Cell(row, 3).Value = reader["DET_PROCODE"].ToString();
+                            worksheet.Cell(row, 4).Value = reader["DET_PRODESC"].ToString();
+                            worksheet.Cell(row, 5).Value = reader["DET_CASEQTY"].ToString();
+                            worksheet.Cell(row, 6).Value = reader["DET_CPRICE"].ToString();
+                            worksheet.Cell(row, 7).Value = reader["DET_AMOUNT"].ToString();
+                            row++; 
+                        }
+                    }
+                }
+            }
+            worksheet.Columns().AdjustToContents();
+            workbook.SaveAs(filePath);
+        }
+
+        return filePath;
+    }
     static void UpdateStatus(int id)
     {
         string updateQuery = "UPDATE M_TBLMAILDETAILS SET TB_STATUS = 1 WHERE TB_ID = @ID";
-        Console.WriteLine("Status Update: " + id);
+        //Console.WriteLine("Status Update: " + id);
         Logger.LogInformation("Email sent with PDF attachment for ID " + id);
         using (SqlConnection con = new SqlConnection(Globalconfig.ConnectionString))
         {

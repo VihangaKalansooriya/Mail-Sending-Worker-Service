@@ -31,10 +31,13 @@ namespace MailWorker
             Globalconfig.databasename = config.GetSection("DatabaseConfiguration")["databasename"];
             Globalconfig.TransactionTemplate = config.GetSection("EmailTemplates")["TransactionTemplate"];
             Globalconfig.PermissionTemplate = config.GetSection("EmailTemplates")["PermissionTemplate"];
+            Globalconfig.ExcelTemplate = config.GetSection("EmailTemplates")["ExcelTemplate"];
             Globalconfig.reportgeneratorpath = config.GetSection("RepoGenPath")["reportgeneratorpath"];
             Globalconfig.PdfFullPath = config.GetSection("AppConfig")["PdfFullPath"];
             Globalconfig.SMTPclient = config.GetSection("EmailConfiguration")["SMTPclient"];
             Globalconfig.Port = int.Parse(config.GetSection("EmailConfiguration")["Port"]);
+            Globalconfig.AttachedFilePath = config.GetSection("PDFfilePath")["AttachedFilePath"];
+            Globalconfig.AttachedEXFilePath = config.GetSection("EXCELfilePath")["AttachedEXFilePath"];
 
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.File(Globalconfig.logfilepath, rollingInterval: RollingInterval.Day)
@@ -42,6 +45,7 @@ namespace MailWorker
 
             int daysThreshold = 7;
             ClearOldFiles(daysThreshold);
+            ClearOldExcelFiles(daysThreshold);
             CreateHostBuilder(args).Build().Run();
 
         }
@@ -54,7 +58,7 @@ namespace MailWorker
 
                 if (!directory.Exists)
                 {
-                    Console.WriteLine("Directory not found.");
+                    //Console.WriteLine("Directory not found.");
                     return;
                 }
 
@@ -72,6 +76,37 @@ namespace MailWorker
             catch (Exception ex)
             {
                 Logger.LogError("Error in Clear Old Files include Program.cs:", ex);
+            }
+        }
+        static void ClearOldExcelFiles(int daysThreshold)
+        {
+            try
+            {
+                // Define the path where Excel files are stored
+                string excelDirectoryPath = Globalconfig.AttachedEXFilePath;
+                DirectoryInfo directory = new DirectoryInfo(excelDirectoryPath);
+
+                if (!directory.Exists)
+                {
+                    Console.WriteLine("Excel directory not found.");
+                    return;
+                }
+
+                DateTime thresholdDate = DateTime.Now.AddDays(-daysThreshold);
+
+                foreach (FileInfo file in directory.GetFiles("*.xlsx")) // Looks specifically for Excel files
+                {
+                    if (file.LastWriteTime < thresholdDate)
+                    {
+                        file.Delete();
+                        Logger.LogInformation($"Deleted old Excel file: {file.FullName}");
+                        //Console.WriteLine($"Deleted old Excel file: {file.FullName}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error clearing old Excel files:", ex);
             }
         }
 

@@ -19,6 +19,9 @@ namespace MailApp1
         public static string PdfFullPath { get; set; }
         public static string SMTPclient { get; set; }
         public static int Port { get; set; }
+        public static string AttachedFilePath { get; set;}
+        public static string AttachedEXFilePath { get; set; }
+        public static string ExcelTemplate { get; set; }
 
     }
 }

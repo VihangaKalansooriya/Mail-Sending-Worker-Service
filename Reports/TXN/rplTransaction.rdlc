@@ -2662,21 +2662,6 @@
                 <PaddingBottom>2pt</PaddingBottom>
               </Style>
             </Textbox>
-            <Image Name="Image4">
-              <Source>Embedded</Source>
-              <Value>Screenshot20231101113532</Value>
-              <Sizing>FitProportional</Sizing>
-              <Top>0cm</Top>
-              <Left>22.62251cm</Left>
-              <Height>0.69853cm</Height>
-              <Width>4.63627cm</Width>
-              <ZIndex>5</ZIndex>
-              <Style>
-                <Border>
-                  <Style>None</Style>
-                </Border>
-              </Style>
-            </Image>
             <Textbox Name="Textbox43">
               <CanGrow>true</CanGrow>
               <KeepTogether>true</KeepTogether>
@@ -2698,7 +2683,7 @@
               <Left>7.12741in</Left>
               <Height>0.18611in</Height>
               <Width>1.22714in</Width>
-              <ZIndex>6</ZIndex>
+              <ZIndex>5</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -2732,7 +2717,7 @@
               <Left>8.49207in</Left>
               <Height>0.19444in</Height>
               <Width>2.25144in</Width>
-              <ZIndex>7</ZIndex>
+              <ZIndex>6</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -2766,7 +2751,7 @@
               <Left>8.48649in</Left>
               <Height>0.19444in</Height>
               <Width>2.25977in</Width>
-              <ZIndex>8</ZIndex>
+              <ZIndex>7</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -2800,7 +2785,7 @@
               <Left>8.49346in</Left>
               <Height>0.19057in</Height>
               <Width>2.24863in</Width>
-              <ZIndex>9</ZIndex>
+              <ZIndex>8</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -2832,7 +2817,7 @@
               <Left>7.12209in</Left>
               <Height>0.18611in</Height>
               <Width>1.22714in</Width>
-              <ZIndex>10</ZIndex>
+              <ZIndex>9</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -2864,7 +2849,7 @@
               <Left>7.12209in</Left>
               <Height>0.18611in</Height>
               <Width>1.22714in</Width>
-              <ZIndex>11</ZIndex>
+              <ZIndex>10</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -2896,7 +2881,7 @@
               <Left>21.30553cm</Left>
               <Height>0.48404cm</Height>
               <Width>0.23378cm</Width>
-              <ZIndex>12</ZIndex>
+              <ZIndex>11</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -2928,7 +2913,7 @@
               <Left>21.30553cm</Left>
               <Height>0.48404cm</Height>
               <Width>0.23378cm</Width>
-              <ZIndex>13</ZIndex>
+              <ZIndex>12</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -2960,7 +2945,7 @@
               <Left>21.30553cm</Left>
               <Height>0.48404cm</Height>
               <Width>0.23378cm</Width>
-              <ZIndex>14</ZIndex>
+              <ZIndex>13</ZIndex>
               <Style>
                 <Border>
                   <Style>None</Style>
@@ -3056,7 +3041,6 @@
               <Source>Embedded</Source>
               <Value>ID24x7RetailLogo1</Value>
               <Sizing>FitProportional</Sizing>
-              <Top>0in</Top>
               <Height>0.47832in</Height>
               <Width>1.20084in</Width>
               <ZIndex>2</ZIndex>
